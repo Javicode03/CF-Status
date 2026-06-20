@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CF Stats — Analizador de perfil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F7FB;
+    --surface:#FFFFFF;
+    --ink:#1B2430;
+    --ink-soft:#5B6472;
+    --ink-faint:#9AA2AF;
+    --accent:#3568B0;
+    --accent-soft:#EAF1FB;
+    --border:#E3E6ED;
+    --pos:#1F9254;
+    --neg:#D14343;
+
+    --tier-newbie:#A0A0A0;
+    --tier-pupil:#5CB85C;
+    --tier-specialist:#28C2C2;
+    --tier-expert:#4D7FE0;
+    --tier-cm:#A35DDB;
+    --tier-master:#E8941A;
+    --tier-gm:#E0432E;
+    --tier-lgm:#B0261A;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  .wrap{
+    max-width:920px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+  }
+
+  /* Header */
+  header.top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header.top .brand{
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    color:var(--ink);
+  }
+  header.top .brand span{color:var(--accent);}
+  header.top .tagline{
+    font-size:13px;
+    color:var(--ink-faint);
+  }
+
+  /* Search */
+  .search-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+    display:flex;
+    gap:10px;
+    box-shadow:0 1px 2px rgba(20,30,50,0.04);
+  }
+  .search-card input{
+    flex:1;
+    border:1.5px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:15px;
+    font-family:'JetBrains Mono',monospace;
+    color:var(--ink);
+    background:#FBFCFE;
+    outline:none;
+    transition:border-color .15s ease;
+  }
+  .search-card input:focus{border-color:var(--accent);background:#fff;}
+  .search-card button:hover{background:#2C5897;}
+  .search-card button:active{transform:scale(0.98);}
+  .search-card button:disabled{background:var(--ink-faint);cursor:wait;}
+
+  .status-msg{
+    margin-top:14px;
+    font-size:14px;
+    color:var(--ink-soft);
+    min-height:18px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .status-msg.error{color:var(--neg);}
+
+  .spinner{
+    width:15px;
+    height:15px;
+    border:2px solid var(--accent-soft);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    flex-shrink:0;
+    display:none;
+  }
+  .status-msg.loading .spinner{display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .progress-track{
+    height:3px;
+    background:var(--border);
+    border-radius:3px;
+    overflow:hidden;
+    margin-top:10px;
+    display:none;
+  }
+  .status-msg.loading + .progress-track{display:block;}
+  .progress-fill{
+    height:100%;
+    width:30%;
+    background:var(--accent);
+    border-radius:3px;
+    animation:loadbar 1.1s ease-in-out infinite;
+  }
+  @keyframes loadbar{
+    0%{transform:translateX(-100%);}
+    100%{transform:translateX(330%);}
+  }
+
+  .search-card button{
+    border:none;
+    background:var(--accent);
+    color:#fff;
+    font-weight:600;
+    font-size:14px;
+    padding:0 22px;
+    border-radius:10px;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-width:96px;
+  }
+
+  /* Hero */
+  #results{display:none;margin-top:28px;}
+  .hero{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:28px;
+    margin-bottom:18px;
+  }
+  .hero-top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:22px;
+  }
+  .hero-handle{
+    font-size:26px;
+    font-weight:800;
+  }
+  .hero-rank{
+    font-size:13px;
+    font-weight:600;
+    text-transform:capitalize;
+    margin-top:2px;
+  }
+  .hero-numbers{
+    display:flex;
+    gap:28px;
+  }
+  .hero-number{text-align:right;}
+  .hero-number .val{
+    font-family:'JetBrains Mono',monospace;
+    font-size:24px;
+    font-weight:700;
+  }
+  .hero-number .lbl{
+    font-size:11px;
+    color:var(--ink-faint);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  /* Rating meter — signature element */
+  .meter{
+    position:relative;
+    height:14px;
+    border-radius:8px;
+    background:linear-gradient(to right,
+      var(--tier-newbie) 0%, var(--tier-newbie) 12%,
+      var(--tier-pupil) 12%, var(--tier-pupil) 22%,
+      var(--tier-specialist) 22%, var(--tier-specialist) 32%,
+      var(--tier-expert) 32%, var(--tier-expert) 46%,
+      var(--tier-cm) 46%, var(--tier-cm) 58%,
+      var(--tier-master) 58%, var(--tier-master) 70%,
+      var(--tier-gm) 70%, var(--tier-gm) 85%,
+      var(--tier-lgm) 85%, var(--tier-lgm) 100%
+    );
+    margin-top:10px;
+  }
+  .meter-marker{
+    position:absolute;
+    top:-5px;
+    width:4px;
+    height:24px;
+    background:var(--ink);
+    border-radius:2px;
+    transform:translateX(-50%);
+    box-shadow:0 0 0 2px #fff;
+  }
+  .meter-scale{
+    display:flex;
+    justify-content:space-between;
+    font-size:10px;
+    color:var(--ink-faint);
+    margin-top:6px;
+    font-family:'JetBrains Mono',monospace;
+  }
+
+  /* Toggle */
+  .controls{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .controls .ctrl-label{
+    font-size:13px;
+    color:var(--ink-soft);
+    font-weight:500;
+  }
+  .segmented{
+    display:inline-flex;
+    background:#EDEFF4;
+    border-radius:10px;
+    padding:3px;
+  }
+  .segmented button{
+    border:none;
+    background:transparent;
+    padding:8px 14px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    border-radius:8px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .segmented button.active{
+    background:#fff;
+    color:var(--accent);
+    box-shadow:0 1px 3px rgba(20,30,50,0.12);
+  }
+
+  /* Cards */
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin-bottom:18px;
+  }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px;
+  }
+  .card h3{
+    margin:0 0 16px;
+    font-size:14px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--ink-soft);
+  }
+  .card .total-count{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:400;
+    color:var(--ink-faint);
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  /* Bar rows */
+  .bar-row{
+    display:grid;
+    grid-template-columns:46px 1fr 34px;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+    font-size:13px;
+  }
+  .bar-row .bar-label{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .bar-row .bar-track{
+    height:8px;
+    background:#EEF0F5;
+    border-radius:5px;
+    overflow:hidden;
+  }
+  .bar-row .bar-fill{
+    height:100%;
+    background:var(--accent);
+    border-radius:5px;
+  }
+  .bar-row .bar-count{
+    font-family:'JetBrains Mono',monospace;
+    text-align:right;
+    color:var(--ink-soft);
+  }
+
+  /* Letters card extras */
+  .points-total{
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px dashed var(--border);
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .points-total .pt-label{
+    font-size:13px;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  .points-total .pt-value{
+    font-family:'JetBrains Mono',monospace;
+    font-size:22px;
+    font-weight:700;
+    color:var(--accent);
+  }
+
+  /* Tag chips */
+  .tag-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:7px 0;
+    border-bottom:1px solid #F1F2F6;
+    font-size:13px;
+  }
+  .tag-row:last-child{border-bottom:none;}
+  .tag-name{color:var(--ink);}
+  .tag-count{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--ink-soft);
+    background:var(--accent-soft);
+    padding:2px 9px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+  }
+
+  /* Timeline */
+  .timeline-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px;
+  }
+  .timeline{
+    position:relative;
+    padding-left:18px;
+  }
+  .timeline::before{
+    content:'';
+    position:absolute;
+    left:4px; top:6px; bottom:6px;
+    width:2px;
+    background:var(--border);
+  }
+  .t-item{
+    position:relative;
+    padding-bottom:18px;
+  }
+  .t-item:last-child{padding-bottom:0;}
+  .t-item::before{
+    content:'';
+    position:absolute;
+    left:-18px;
+    top:4px;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 3px #fff;
+  }
+  .t-name{
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .t-meta{
+    display:flex;
+    gap:14px;
+    margin-top:3px;
+    font-size:12px;
+    color:var(--ink-faint);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .t-meta .delta-pos{color:var(--pos);font-weight:700;}
+  .t-meta .delta-neg{color:var(--neg);font-weight:700;}
+
+  footer.note{
+    margin-top:24px;
+    font-size:12px;
+    color:var(--ink-faint);
+    text-align:center;
+  }
+
+  /* Responsive */
+  @media (max-width:680px){
+    .grid{grid-template-columns:1fr;}
+    .hero-top{flex-direction:column;align-items:flex-start;}
+    .hero-numbers{gap:20px;width:100%;justify-content:space-between;}
+    .hero-number{text-align:left;}
+    .search-card{flex-direction:column;}
+    .search-card button{padding:12px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">CF<span>Stats</span></div>
+    <div class="tagline">desglose de perfil de Codeforces</div>
+  </header>
+
+  <div class="search-card">
+    <input id="handleInput" type="text" placeholder="Handle de Codeforces (ej: tourist)" autocomplete="off">
+    <button id="searchBtn"><span id="searchBtnText">Buscar</span></button>
+  </div>
+  <div class="status-msg" id="statusMsg"><div class="spinner"></div><span id="statusText"></span></div>
+  <div class="progress-track"><div class="progress-fill"></div></div>
+
+  <div id="results">
+
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="hero-handle" id="heroHandle"></div>
+          <div class="hero-rank" id="heroRank"></div>
+        </div>
+        <div class="hero-numbers">
+          <div class="hero-number">
+            <div class="val" id="heroRating">—</div>
+            <div class="lbl">rating</div>
+          </div>
+          <div class="hero-number">
+            <div class="val" id="heroMaxRating">—</div>
+            <div class="lbl">máximo</div>
+          </div>
+          <div class="hero-number">
+            <div class="val" id="heroSolved">—</div>
+            <div class="lbl">resueltos</div>
+          </div>
+        </div>
+      </div>
+      <div class="meter">
+        <div class="meter-marker" id="meterMarker" style="left:0%"></div>
+      </div>
+      <div class="meter-scale">
+        <span>0</span><span>1200</span><span>1400</span><span>1600</span><span>1900</span><span>2100</span><span>2400</span><span>3000+</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <span class="ctrl-label">Conteo de problemas:</span>
+      <div class="segmented">
+        <button id="modeUnique" class="active">Únicos</button>
+        <button id="modeRepeat">Con repetidos (por lenguaje)</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Por categoría <span class="total-count" id="tagTotalLbl"></span></h3>
+        <div id="tagList"></div>
+      </div>
+
+      <div class="card">
+        <h3>Por letra</h3>
+        <div id="letterList"></div>
+        <div class="points-total">
+          <span class="pt-label">Puntos totales (A=1, B=2...)</span>
+          <span class="pt-value" id="pointsTotal">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="timeline-card">
+      <h3 style="margin-bottom:16px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);">Contests</h3>
+      <div class="timeline" id="contestTimeline"></div>
+    </div>
+
+  </div>
+
+  <footer class="note">Datos obtenidos en vivo desde la API pública de Codeforces.</footer>
+</div>
+
+<script>
+const API = "https://codeforces.com/api";
+
+let currentSubs = [];
+let mode = "unique"; // "unique" | "repeat"
+
+const $ = id => document.getElementById(id);
+
+async function apiGet(endpoint, params){
+  const url = new URL(`${API}/${endpoint}`);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.status !== "OK"){
+    throw new Error(data.comment || "Error desconocido de la API");
+  }
+  return data.result;
+}
+
+function ratingColor(r){
+  if(r == null) return getComputedStyle(document.documentElement).getPropertyValue('--tier-newbie');
+  if(r < 1200) return 'var(--tier-newbie)';
+  if(r < 1400) return 'var(--tier-pupil)';
+  if(r < 1600) return 'var(--tier-specialist)';
+  if(r < 1900) return 'var(--tier-expert)';
+  if(r < 2100) return 'var(--tier-cm)';
+  if(r < 2400) return 'var(--tier-master)';
+  if(r < 3000) return 'var(--tier-gm)';
+  return 'var(--tier-lgm)';
+}
+
+// Maps rating to a 0-100% position on the meter, matching the gradient stops above
+function ratingToMeterPercent(r){
+  if(r == null) r = 0;
+  const stops = [
+    [0,0],[1200,12],[1400,22],[1600,32],[1900,46],[2100,58],[2400,70],[3000,85],[4000,100]
+  ];
+  for(let i=0;i<stops.length-1;i++){
+    const [r0,p0] = stops[i], [r1,p1] = stops[i+1];
+    if(r >= r0 && r <= r1){
+      const t = (r-r0)/(r1-r0);
+      return p0 + t*(p1-p0);
+    }
+  }
+  return r > 4000 ? 100 : 0;
+}
+
+function dedupedSolved(subs, mode){
+  const seen = new Set();
+  const out = [];
+  for(const s of subs){
+    if(s.verdict !== "OK") continue;
+    const p = s.problem;
+    const key = mode === "repeat"
+      ? `${p.contestId}-${p.index}-${s.programmingLanguage}`
+      : `${p.contestId}-${p.index}`;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
+function letterOf(index){
+  const m = index.match(/^[A-Za-z]+/);
+  return m ? m[0].toUpperCase() : index;
+}
+
+function letterPoints(letter){
+  const c = letter.charCodeAt(0);
+  if(c >= 65 && c <= 90) return c - 65 + 1;
+  return 0;
+}
+
+function renderTags(problems){
+  const counter = {};
+  for(const p of problems){
+    for(const t of (p.tags || [])){
+      counter[t] = (counter[t]||0) + 1;
+    }
+  }
+  const entries = Object.entries(counter).sort((a,b)=>b[1]-a[1]);
+  const max = entries.length ? entries[0][1] : 1;
+  $('tagTotalLbl').textContent = `(${entries.length} tags)`;
+  $('tagList').innerHTML = entries.map(([tag,count]) => `
+    <div class="tag-row">
+      <span class="tag-name">${tag}</span>
+      <span class="tag-count">${count}</span>
+    </div>
+  `).join('') || '<div style="color:var(--ink-faint);font-size:13px;">Sin datos</div>';
+}
+
+function renderLetters(problems){
+  const counter = {};
+  for(const p of problems){
+    const letter = letterOf(p.index);
+    counter[letter] = (counter[letter]||0) + 1;
+  }
+  const letters = Object.keys(counter).sort();
+  const max = letters.length ? Math.max(...letters.map(l=>counter[l])) : 1;
+  let totalPoints = 0;
+
+  $('letterList').innerHTML = letters.map(letter => {
+    const count = counter[letter];
+    const pts = letterPoints(letter);
+    totalPoints += count * pts;
+    const pct = Math.round((count/max)*100);
+    return `
+      <div class="bar-row">
+        <span class="bar-label">${letter}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span class="bar-count">${count}</span>
+      </div>
+    `;
+  }).join('') || '<div style="color:var(--ink-faint);font-size:13px;">Sin datos</div>';
+
+  $('pointsTotal').textContent = totalPoints;
+}
+
+function renderContests(contests){
+  if(!contests.length){
+    $('contestTimeline').innerHTML = '<div style="color:var(--ink-faint);font-size:13px;">Sin contests registrados</div>';
+    return;
+  }
+  const sorted = [...contests].sort((a,b)=>b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds);
+  $('contestTimeline').innerHTML = sorted.map(c => {
+    const delta = c.newRating - c.oldRating;
+    const sign = delta >= 0 ? '+' : '';
+    const deltaClass = delta >= 0 ? 'delta-pos' : 'delta-neg';
+    const date = new Date(c.ratingUpdateTimeSeconds * 1000).toLocaleDateString('es-ES', {day:'2-digit',month:'short',year:'numeric'});
+    return `
+      <div class="t-item">
+        <div class="t-name">${c.contestName}</div>
+        <div class="t-meta">
+          <span>${date}</span>
+          <span>rank ${c.rank}</span>
+          <span>${c.oldRating} → ${c.newRating} <span class="${deltaClass}">(${sign}${delta})</span></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function refreshComputedViews(){
+  const problems = dedupedSolved(currentSubs, mode);
+  $('heroSolved').textContent = problems.length;
+  renderTags(problems);
+  renderLetters(problems);
+}
+
+async function runSearch(){
+  const handle = $('handleInput').value.trim();
+  if(!handle) return;
+
+  const btn = $('searchBtn');
+  const btnText = $('searchBtnText');
+  const statusEl = $('statusMsg');
+  const statusText = $('statusText');
+
+  btn.disabled = true;
+  btnText.textContent = 'Buscando...';
+  statusEl.className = 'status-msg loading';
+  statusText.textContent = `Consultando el perfil de "${handle}" en Codeforces...`;
+  $('results').style.display = 'none';
+
+  try{
+    const [info, subs, contests] = await Promise.all([
+      apiGet('user.info', {handles: handle}),
+      apiGet('user.status', {handle: handle}),
+      apiGet('user.rating', {handle: handle}).catch(()=>[])
+    ]);
+
+    const user = info[0];
+    currentSubs = subs;
+
+    $('heroHandle').textContent = user.handle;
+    $('heroHandle').style.color = ratingColor(user.rating);
+    $('heroRank').textContent = user.rank || 'sin rango';
+    $('heroRank').style.color = ratingColor(user.rating);
+    $('heroRating').textContent = user.rating ?? '—';
+    $('heroMaxRating').textContent = user.maxRating ?? '—';
+    $('meterMarker').style.left = ratingToMeterPercent(user.rating) + '%';
+
+    renderContests(contests);
+    refreshComputedViews();
+
+    statusEl.className = 'status-msg';
+    statusText.textContent = '';
+    $('results').style.display = 'block';
+  }catch(err){
+    statusEl.className = 'status-msg error';
+    statusText.textContent = `Error: ${err.message}`;
+  }finally{
+    btn.disabled = false;
+    btnText.textContent = 'Buscar';
+  }
+}
+
+$('searchBtn').addEventListener('click', runSearch);
+$('handleInput').addEventListener('keydown', e => { if(e.key === 'Enter') runSearch(); });
+
+$('modeUnique').addEventListener('click', () => {
+  mode = 'unique';
+  $('modeUnique').classList.add('active');
+  $('modeRepeat').classList.remove('active');
+  if(currentSubs.length) refreshComputedViews();
+});
+$('modeRepeat').addEventListener('click', () => {
+  mode = 'repeat';
+  $('modeRepeat').classList.add('active');
+  $('modeUnique').classList.remove('active');
+  if(currentSubs.length) refreshComputedViews();
+});
+</script>
+</body>
+</html>
